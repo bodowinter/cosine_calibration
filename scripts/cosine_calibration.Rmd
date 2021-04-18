@@ -1,0 +1,418 @@
+---
+title: "Cosine Calibration - Material selection"
+author: "Bodo Winter"
+date: "8/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The goal of this experiment is to see whether the cosine measure introduced by Winter (2019) reliably rpedicts metaphoricity / literalness ratings. For this, a set of words with a range of cosine values needs to be selected.
+
+## Preprocessing:
+
+Load data and pacakges
+
+```{r, message = FALSE}
+library(tidyverse)
+lyn <- read_csv('../data/lynott_connell_full.csv') %>% 
+  select(-(Foot_leg.mean:Torso.mean), -Exclusivity.action, -Exclusivity.sensorimotor) %>% 
+  rename(Excl = Exclusivity.perceptual,
+         Mod = Modality)
+```
+
+Get rid of those words that have as their dominant modality interoceptive words:
+
+```{r}
+lyn <- filter(lyn, Mod != 'Interoceptive')
+```
+
+Load SUBTLEX POS tags:
+
+```{r, message = FALSE}
+SUBTL <- read_csv('../data/SUBTLEX_US_with_POS.csv') %>% rename(POS = Dom_PoS_SUBTLEX) %>% 
+  select(Word, POS)
+```
+
+Merge:
+
+```{r}
+lyn <- left_join(lyn, SUBTL)
+```
+
+Get nouns only:
+
+```{r}
+noun <- filter(lyn, POS == 'Noun')
+```
+
+For adjectives, we'll use the Lynott & Connell (2009) norms. These contain many more useful adjectives, as they are more specifically focused on perception (e.g., there's many auditory words such as "banging", "beeping", "squealing" that don't occur in the new Lancaster norms):
+
+```{r, message = FALSE}
+adj <- read_csv('../data/lynott_connell_2009_adj_norms.csv') %>% 
+  select(-PropertyBritish) %>% 
+  rename(Mod = DominantModality,
+         Excl = ModalityExclusivity)
+```
+
+Get only those that are the 10% most exclusive within their perceptual modality, for adjectives, and select the 5 highest-ranking ones:
+
+```{r}
+set.seed(666)
+mods <- unique(adj$Mod)
+xres <- c()
+for (i in seq_along(mods)) {
+  this_df <- filter(adj, Mod == mods[i])
+  this_df <- filter(this_df, Excl > quantile(Excl, 0.8))
+  this_df <- sample_n(this_df, 5)
+  xres <- bind_rows(xres, this_df)
+}
+```
+
+We select 5 random ones because otherwise the touch ones will all be "aching" etc. (They are all interoceptive)
+
+```{r}
+these_words <- xres %>% pull(Word)
+these_words
+```
+
+Some replacements, "tight" is shape based and quite a common sensible, and there's no texture surface descriptor in there, so let's add "smooth". "tepid" isn't known by many people, let's replace it with "warm". Let's also replace "weightless" with "hard" so that we have both roughness/smoothness and hardness/softness, the two primary dimensions of surface perception.
+
+```{r}
+these_words[these_words == 'tight'] <- 'smooth'
+these_words[these_words == 'weightless'] <- 'hard'
+these_words[these_words == 'tepid'] <- 'warm'
+```
+
+"Blonde" is specific to hair color, and "sunny" specific to weather:
+
+```{r}
+these_words[these_words == 'blonde'] <- 'blue'
+these_words[these_words == 'sunny'] <- 'bright'
+```
+
+Replace the infrequent "tangy" with "sweet". Also, "whiffy" seems quite British and since this will be tested in America and there's no positive smell word so far:
+
+```{r}
+these_words[these_words == 'tangy'] <- 'sweet'
+these_words[these_words == 'whiffy'] <- 'fragrant'
+```
+
+Replace "cooing" with "squealing":
+
+```{r}
+these_words[these_words == 'cooing'] <- 'squealing'
+these_words[these_words == 'mute'] <- 'beeping'
+```
+
+Get our adjectives:
+
+```{r}
+adj <- filter(adj, Word %in% these_words)
+```
+
+
+## Noun selection
+
+For nouns we need to be a bit more selective, since most nouns are not ABOUT perceptual impressions, the same way that the adjectives from Lynott & Connell (2009) are about these. Also, we need to make sure that when the noun is combined with the adjective, it doesn't refer to an object, e.g., the sound noun "whistle", when combined with "red" could just be taken to refer to a literal whistle that is red, and not to a whistling sound.
+
+```{r}
+noun %>% arrange(desc(Visual.mean)) %>% pull(Word) %>% head(150)
+```
+
+These are the to-selected, based on that they actually describe visual impressions, and also not shape (since shape is a common sensible to many senses).
+
+MMmhm: "Lighting" and "starlight" are good candidates as well, but they seem to come with specific assumptions (perhaps neon as well).
+
+```{r}
+vis <- c('brightness', 'color', 'gleam', 'lighting', 'vision',
+         'darkness', 'glimmer', 'neon', 'starlight')
+```
+
+Same for touch:
+
+```{r}
+noun %>% arrange(desc(Haptic.mean)) %>% pull(Word) %>% head(150)
+```
+
+The problem with these is the following: There's no nouns that are specifically about touch in general (except for "touch" and "feeling", which are also highly polysemous). If we take "softness", then this will create weird mismatches, like "rough softness", which will sound metaphorical not because they combine dissimilar modalities, but because they are on opposite end of the scale of the same modality. 
+
+We will take "touch", "feeling", and "contact" from the main data frame (they are not in the "noun" tibble since they are predominantly verbs, but since we'll present them in a nominal sentence frame, people will understand them to be nouns).
+
+```{r}
+hap <- c('touch', 'feeling', 'contact')
+```
+
+Sound nouns:
+
+```{r}
+noun %>% arrange(desc(Auditory.mean)) %>% pull(Word) %>% head(150)
+```
+
+Select these:
+
+```{r}
+aud <- c('noise', 'music', 'melody', 'harmonics', 'timbre', 'chatter', 'echo')
+```
+
+Taste:
+
+```{r}
+noun %>% arrange(desc(Gustatory.mean)) %>% pull(Word) %>% head(100)
+```
+
+Select these:
+
+```{r}
+gus <- c('flavor', 'taste')
+```
+
+Also, take "taste" from the main dataset.
+
+Smell:
+
+```{r}
+noun %>% arrange(desc(Olfactory.mean)) %>% pull(Word) %>% head(100)
+```
+
+Select these:
+
+```{r}
+olf <- c('aroma', 'odor', 'smell', 'scent')
+```
+
+Get these nouns:
+
+```{r}
+all_senses <- c(vis, aud, hap, gus, olf)
+noun <- filter(lyn, Word %in% all_senses)
+```
+
+Make the perceptual strength columns the same for both data frames:
+
+```{r}
+noun <- rename(noun,
+               Aud = Auditory.mean,
+               Gus = Gustatory.mean,
+               Olf = Olfactory.mean,
+               Hap = Haptic.mean,
+               Vis = Visual.mean)
+adj <- rename(adj,
+               Aud = AuditoryStrengthMean,
+               Gus = GustatoryStrengthMean,
+               Olf = OlfactoryStrengthMean,
+               Hap = HapticStrengthMean,
+               Vis = VisualStrengthMean)
+
+noun <- select(noun, Word, Excl, Mod, Vis, Aud, Hap, Gus, Olf)
+adj <- select(adj, Word, Excl, Mod, Vis, Aud, Hap, Gus, Olf)
+```
+
+Create all combinations:
+
+```{r}
+adjs <- pull(adj, Word)
+nouns <- pull(noun, Word)
+
+all_combs <- expand.grid(adjs, nouns)
+all_combs[, 1] <- as.character(all_combs[, 1])
+all_combs[, 2] <- as.character(all_combs[, 2])
+```
+
+## Compute cosine similarity:
+
+Define function for cosine similarity:
+
+```{r}
+cosine_sim_fast <- function(x, y) {
+	as.vector((x %*% y) / (sqrt(x %*% x * y %*% y)))
+	}
+```
+
+Loop through all_combs and compute cosines:
+
+```{r}
+all_cosims <- numeric(nrow(all_combs))
+for (i in 1:nrow(all_combs)) {
+  this_adj <- all_combs[i, 1]
+  this_noun <- all_combs[i, 2]
+  vector1 <- filter(adj, Word == this_adj) %>%  select(Vis:Olf) %>% unlist()
+  vector2 <- filter(noun, Word == this_noun) %>% select(Vis:Olf) %>% unlist()
+  all_cosims[i] <- cosine_sim_fast(vector1, vector2)
+}
+```
+
+Check:
+
+```{r}
+mean(all_cosims)
+range(all_cosims)
+```
+
+Make a plot of the distribution:
+
+```{r, fig.width = 8, fig.height = 6}
+hist(all_cosims, col = 'steelblue')
+```
+
+Append this to the all_combs data frame:
+
+```{r}
+colnames(all_combs) <- c('Adj', 'Noun')
+all_combs$Cosine <- all_cosims
+head(all_combs)
+```
+
+Append adjective and noun modality, since we want to select similar amounts per modality:
+
+```{r}
+all_combs$AdjMod <- adj[match(all_combs$Adj, adj$Word), ]$Mod
+all_combs$NounMod <- lyn[match(all_combs$Noun, lyn$Word), ]$Mod
+```
+
+## Select 10 words from each cosine band (0-0.1, 0.1-0.2 etc.):
+
+Define bands:
+
+```{r}
+bands <- seq(0, 1, 0.1)
+```
+
+Loop through:
+
+```{r}
+set.seed(42)
+xall <- c()
+for (i in 1:(length(bands) - 1)) {
+  lb <- bands[i]
+  up <- bands[i + 1]
+  this_cos <- filter(all_combs, Cosine > lb, Cosine < up)
+  
+  # Reshuffle:
+  
+  this_cos <- sample_n(this_cos, size = nrow(this_cos))
+  
+  # Get rid of duplicats, except for bands 0.6 to 0.9 where this proves to be too exclusive:
+
+  if (!(lb %in% bands[7:9])) {
+    
+  # Get rid of duplicated nouns:
+  
+  this_cos <- filter(this_cos, !duplicated(Noun))
+  
+  # Get rid of duplicated noun modalities, unless it's the band 0.6 to 0.9:
+  
+  this_cos <- filter(this_cos, !duplicated(NounMod))
+  }
+  
+  # For band 0.6 to 0.9 pick 5 random ones:
+  
+  if (lb %in% bands[7:9]) {
+    this_cos <- filter(this_cos, !duplicated(Adj))
+    this_cos <- sample_n(this_cos, 5)
+  }
+  
+  # Append:
+  
+  xall <- bind_rows(xall, this_cos)
+}
+```
+
+Check the results:
+
+```{r}
+xall
+```
+
+The cosine bands 0.6 to 0.9 kinda suck since they are almost all the same within each band. Let's change that by hand-picking some that are different:
+
+```{r}
+xall[32, ] <- filter(all_combs, Adj == 'warm', Noun == 'taste')
+xall[33, ] <- filter(all_combs, Adj == 'hard', Noun == 'color')
+
+xall[37, ] <- filter(all_combs, Adj == 'woolly', Noun == 'vision')
+xall[40, ] <- filter(all_combs, Adj == 'scaly', Noun == 'glimmer')
+```
+
+For the band 0.8 to 0.9 there's nothing we can do since they are all touch-touch, except for one taste-taste.
+
+How is this distributed across noun modalities?
+
+```{r}
+table(xall$NounMod)
+table(xall$AdjMod)
+```
+
+What about combinations?
+
+```{r}
+with(xall, table(AdjMod, NounMod))
+```
+
+Check that there's enough per band of cosine:
+
+```{r}
+table(cut(xall$Cosine, breaks = bands))
+```
+
+Histogram:
+
+```{r, fig.width = 8, fig.height = 6}
+hist(xall$Cosine, col = 'steelblue')
+```
+
+Make an ID variable and a "full stimulus" column (so that the entire expression can easily be copy and pasted).
+
+```{r}
+xall$ID <- str_c('Item_', 1:nrow(xall))
+xall <- mutate(xall, FullStimulus = str_c(Adj, ' ', Noun))
+```
+
+Add crossmodal information to stimuli:
+
+```{r}
+xall <- mutate(xall,
+               CrossModality = ifelse(AdjMod == NounMod, 'unimodal', 'crossmodal'))
+```
+
+Add hierarchy consistent/inconsistent information to stimuli:
+
+```{r}
+xall$Hierarchy <- 'inconsistent'
+try(xall[xall$AdjMod == 'Haptic' & xall$NounMod == 'Gustatory', ]$Hierarchy <- 'consistent')
+try(xall[xall$AdjMod == 'Haptic' & xall$NounMod == 'Olfactory', ]$Hierarchy <- 'consistent')
+try(xall[xall$AdjMod == 'Haptic' & xall$NounMod == 'Auditory', ]$Hierarchy <- 'consistent')
+try(xall[xall$AdjMod == 'Haptic' & xall$NounMod == 'Visual', ]$Hierarchy <- 'consistent')
+try(xall[xall$AdjMod == 'Gustatory' & xall$NounMod == 'Olfactory', ]$Hierarchy <- 'consistent')
+try(xall[xall$AdjMod == 'Gustatory' & xall$NounMod == 'Auditory', ]$Hierarchy <- 'consistent')
+try(xall[xall$AdjMod == 'Gustatory' & xall$NounMod == 'Visual', ]$Hierarchy <- 'consistent')
+try(xall[xall$AdjMod == 'Olfactory' & xall$NounMod == 'Visual', ]$Hierarchy <- 'consistent')
+try(xall[xall$AdjMod == 'Olfactory' & xall$NounMod == 'Auditory', ]$Hierarchy <- 'consistent')
+try(xall[xall$AdjMod == 'Visual' & xall$NounMod == 'Auditory', ]$Hierarchy <- 'consistent')
+try(xall[xall$AdjMod == 'Auditory' & xall$NounMod == 'Visual', ]$Hierarchy <- 'consistent')
+xall[xall$CrossModality == 'unimodal', ]$Hierarchy <- NA
+```
+
+We will exchange "vision" with "sight", as it is possible to misunderstand "vision" to be about thinking about the future, or a dream.
+
+```{r}
+xall[xall$Noun == 'vision', ]$FullStimulus <- 'woolly sight'
+xall[xall$Noun == 'vision', ]$Noun <- 'sight'
+```
+
+Write this to file:
+
+```{r}
+write_csv(xall, '../data/stimuli.csv')
+```
+
+
+
+
+
+
+
+
+
