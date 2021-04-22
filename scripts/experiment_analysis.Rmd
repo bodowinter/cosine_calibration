@@ -1,0 +1,662 @@
+---
+title: "Analysis of metaphoricity & creativity"
+author: "Bodo"
+date: "19/04/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prelims
+
+Load packages:
+
+```{r, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(brms)
+library(ggridges)
+library(patchwork)
+```
+
+Load experiment data:
+
+```{r, message = FALSE, warning = FALSE}
+E1 <- read_csv('../data/E1_data.csv')
+E2 <- read_csv('../data/E2_data.csv')
+```
+
+Load stimulus characteristics:
+
+```{r}
+stims <- read_csv('../data/stimuli.csv')
+```
+
+For reproducibility, report R version, and brms package version:
+
+```{r}
+R.Version()$version.string
+packageVersion('brms')
+packageVersion('tidyverse')
+packageVersion('ggridges')
+packageVersion('patchwork')
+```
+
+brms settings for faster computing:
+
+```{r}
+options(mc.cores=parallel::detectCores())
+```
+
+## Data cleaning
+
+Rename ID column to something shorter:
+
+```{r}
+E1 <- rename(E1, ID = ResponseId)
+E2 <- rename(E2, ID = ResponseId)
+```
+
+This data is complete (there is no incomplete data, as otherwise it would not be moved to completed responses from Qualtrics).
+
+Check whether exclusions need to be performed because of the catch trial. The answer was 5:
+
+```{r}
+all(E1$CatchTrial == 5)
+all(E2$CatchTrial == 5)
+```
+
+Exclusions because of native speakers?
+
+```{r}
+E1 %>% count(NativeSpeaker)
+E2 %>% count(NativeSpeaker)
+```
+
+Exclude:
+
+```{r}
+E2 <- filter(E2, NativeSpeaker != "No, I did not grow up speaking English at home")
+```
+
+Make into long format:
+
+```{r}
+E1
+```
+
+Check number of participants:
+
+```{r}
+nrow(E1)
+nrow(E2)
+```
+
+Check number of male/female participants:
+
+```{r}
+E1 %>% count(Gender)
+E2 %>% count(Gender)
+```
+
+Check age range and average age:
+
+```{r}
+mean(E1$Age)
+range(E1$Age)
+
+mean(E2$Age)
+range(E2$Age)
+```
+
+## Convert to long format
+
+Convert into long format:
+
+```{r}
+E1 <- pivot_longer(E1, Item_1:Item_50,
+                   names_to = 'Item',
+                   values_to = 'Response')
+E2 <- pivot_longer(E2, Item_1:Item_50,
+                   names_to = 'Item',
+                   values_to = 'Response')
+```
+
+Make the response in an ordered variable:
+
+```{r}
+# Experiment 1:
+
+E1 <- mutate(E1,
+             Response = factor(Response,
+                               levels = c('very literal', 'literal',
+                                          'moderately literal', 'neutral',
+                                          'moderately metaphoric', 'metaphoric',
+                                          'very metaphoric')),
+             ResponseNum = as.numeric(Response))
+
+# Experiment 2:
+
+E2 <- mutate(E2,
+             Response = factor(Response,
+                               levels = c('very uncreative', 'uncreative',
+                                          'moderately uncreative', 'neutral',
+                                          'moderately creative', 'creative',
+                                          'very creative')),
+             ResponseNum = as.numeric(Response))
+```
+
+Exclude straightliners. 40 times the same response is 80%, which was our pre-registered exclusion criterion. Is anybody above that?
+
+```{r}
+# Experiment 1:
+
+E1 %>% count(ID, Response) %>% 
+  filter(n >= 40)
+
+# Experiment 2:
+
+E2 %>% count(ID, Response) %>% 
+  filter(n >= 40)
+```
+
+Merge with stimulus characteristics:
+
+```{r}
+E1 <- left_join(E1, stims, by = c('Item' = 'ID'))
+E2 <- left_join(E2, stims, by = c('Item' = 'ID'))
+```
+
+Descriptive statistics, average cosine per rating. 7 = very metaphoric; 1 = very literal
+
+```{r}
+E1_means <- E1 %>% group_by(Response) %>% 
+  summarize(M = mean(Cosine))
+```
+
+Descriptive statistics, average cosine per rating for experiment 2. 7 = very metaphoric; 1 = very literal
+
+```{r}
+E2_means <- E2 %>% group_by(Response) %>% 
+  summarize(M = mean(Cosine))
+```
+
+Make barplots of the averages:
+
+```{r}
+# Experiment 1:
+
+E1_barplot <- E1_means %>%
+  ggplot(aes(x = factor(Response),
+             y = M)) +
+  geom_bar(stat = 'identity') +
+  ylab('Average cosine') +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        axis.title.x = element_blank())
+
+# Experiment 2:
+
+E2_barplot <- E2_means %>%
+  ggplot(aes(x = factor(Response),
+             y = M)) +
+  geom_bar(stat = 'identity') +
+  ylab('Average cosine') +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        axis.title.x = element_blank())
+```
+
+Save both externally:
+
+```{r}
+ggsave(plot = E1_barplot, filename = '../figures/E1_barplot.pdf',
+       width = 8, height = 6)
+ggsave(plot = E2_barplot, filename = '../figures/E2_barplot.pdf',
+       width = 8, height = 6)
+```
+
+Show them in the R script, first, Experiment 1:
+
+```{r, fig.width = 8, fig.height = 6}
+E1_barplot
+```
+
+Then, Experiment 2:
+
+```{r, fig.width = 8, fig.height = 6}
+E2_barplot
+```
+
+Round both means tables for reporting:
+
+```{r}
+E1_means <- mutate(E1_means, M = round(M, 2))
+E2_means <- mutate(E2_means, M = round(M, 2))
+```
+
+Save externally:
+
+```{r}
+write_csv(E1_means, '../data/E1_means.csv')
+write_csv(E2_means, '../data/E2_means.csv')
+```
+
+Make a joy plot of this:
+
+```{r}
+# Experiment 1:
+
+E1_joy <- E1 %>% ggplot(aes(x = Cosine,
+                       y = factor(Response))) +
+  xlab('Cosine similarity') +
+  geom_density_ridges() +
+  # coord_cartesian(xlim = c(0, 1)) +
+  theme_ridges() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_text(face = 'bold'),
+        axis.title.x = element_text(face = 'bold', size = 16))
+
+# Experiment 2:
+
+E2_joy <- E2 %>% ggplot(aes(x = Cosine,
+                       y = factor(Response))) +
+  xlab('Cosine similarity') +
+  geom_density_ridges() +
+  # coord_cartesian(xlim = c(0, 1)) +
+  theme_ridges() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_text(face = 'bold'),
+        axis.title.x = element_text(face = 'bold', size = 16))
+```
+
+Show these in the script, Experiment 1:
+
+```{r, fig.width = 8, fig.height = 6}
+E1_joy
+```
+
+Experiment 2:
+
+```{r, fig.width = 8, fig.height = 6}
+E2_joy
+```
+
+Save both seperately:
+
+```{r}
+ggsave(plot = E1_joy, filename = '../figures/E1_joy_plot.pdf',
+       width = 8, height = 6)
+ggsave(plot = E2_joy, filename = '../figures/E2_joy_plot.pdf',
+       width = 8, height = 6)
+```
+
+Put both together and save them in one:
+
+```{r}
+E1_joy <- E1_joy + ggtitle('(a) Experiment 1')
+E2_joy <- E2_joy + ggtitle('(b) Experiment 2')
+
+# Put both together:
+
+both_joy <- E1_joy + E2_joy
+```
+
+Show in script:
+
+```{r, fig.width = 14, fig.height = 6}
+both_joy
+```
+
+Save:
+
+```{r}
+ggsave(plot = both_joy, filename = '../figures/both_joy_plots.pdf',
+       width = 12, height = 6)
+```
+
+## Bayesian models, Experiment 1:
+
+Prior, a weakly informative prior on the slope coefficient with SD = 2:
+
+```{r}
+weak_prior <- prior('normal(0, 2)', class = 'b')
+```
+
+Analyze the ratings, continuous model:
+
+```{r, message = FALSE, warning = FALSE}
+E1_cont <- brm(ResponseNum ~ Cosine +
+                 PairAttested + AdjFreq_log10 + NounFreq_log10 +
+                 (1 + Cosine|ID) +
+                 (1|Adj) + (1|Noun) + (1|Item),
+               data = E1,
+               family = cumulative(),
+              
+               prior = weak_prior,
+              
+               # MCMC variables:
+              
+               cores = 4, chains = 4,
+               init = 0, seed = 42,
+               warmup = 2000, iter = 4000,
+               save_all_pars = TRUE)
+```
+
+Posterior predictive checks:
+
+```{r, fig.width = 8, fig.height = 6}
+pp_check(E1_cont, nsample = 100)
+```
+
+Analyze the ratings, categorical model:
+
+```{r, message = FALSE, warning = FALSE}
+E1_cat <- brm(ResponseNum ~ CrossModality +
+                 PairAttested + AdjFreq_log10 + NounFreq_log10 +
+                 (1 + CrossModality|ID) +
+                 (1|Adj) + (1|Noun) + (1|Item),
+              
+              data = E1,
+              family = cumulative(),
+              
+              prior = weak_prior,
+              
+              # MCMC variables:
+              
+              cores = 4, chains = 4,
+              init = 0, seed = 42,
+              warmup = 2000, iter = 4000,
+              save_all_pars = TRUE)
+```
+
+Posterior predictive checks:
+
+```{r, fig.width = 8, fig.height = 6}
+pp_check(E1_cat, nsample = 100)
+```
+
+Perform LOO:
+
+```{r}
+E1_cont_loo <- loo(E1_cont, moment_match = TRUE)
+E1_cat_loo <- loo(E1_cat, moment_match = TRUE)
+
+# compare:
+
+E1_both_loo <- loo_compare(E1_cont_loo, E1_cat_loo)
+
+# show:
+
+E1_both_loo
+```
+
+Check Bayes R2:
+
+```{r}
+bayes_R2(E1_cat)
+bayes_R2(E1_cont)
+```
+
+Interpret the model:
+
+```{r}
+summary(E1_cont)
+summary(E1_cat)
+```
+
+Check all effects:
+
+```{r}
+E1_posts <- posterior_samples(E1_cont) %>% 
+  select(b_Cosine:b_NounFreq_log10)
+
+# Extract posteriors:
+
+b_cosine <- E1_posts$b_Cosine
+b_attested <- E1_posts$b_PairAttestednot_attested
+b_adj <- E1_posts$b_AdjFreq_log10
+b_noun <- E1_posts$b_NounFreq_log10
+```
+
+Check:
+
+```{r}
+sum(b_cosine > 0) / length(b_cosine)
+sum(b_attested > 0) / length(b_attested)
+sum(b_adj > 0) / length(b_adj)
+sum(b_noun > 0) / length(b_noun)
+```
+
+## Bayesian models, Experiment 2:
+
+Analyze the ratings, continuous model:
+
+```{r, message = FALSE, warning = FALSE}
+E2_cont <- brm(ResponseNum ~ Cosine +
+                 PairAttested + AdjFreq_log10 + NounFreq_log10 +
+                 (1 + Cosine|ID) +
+                 (1|Adj) + (1|Noun) + (1|Item),
+               data = E2,
+               family = cumulative(),
+              
+               prior = weak_prior,
+              
+               # MCMC variables:
+              
+               cores = 4, chains = 4,
+               init = 0, seed = 42,
+               warmup = 2000, iter = 4000,
+               save_all_pars = TRUE)
+```
+
+Posterior predictive checks:
+
+```{r, fig.width = 8, fig.height = 6}
+pp_check(E2_cont, nsample = 100)
+```
+
+Analyze the ratings, categorical model:
+
+```{r, message = FALSE, warning = FALSE}
+E2_cat <- brm(ResponseNum ~ CrossModality +
+                 PairAttested + AdjFreq_log10 + NounFreq_log10 +
+                 (1 + CrossModality|ID) +
+                 (1|Adj) + (1|Noun) + (1|Item),
+              
+              data = E2,
+              family = cumulative(),
+              
+              prior = weak_prior,
+              
+              # MCMC variables:
+              
+              cores = 4, chains = 4,
+              init = 0, seed = 42,
+              warmup = 2000, iter = 4000,
+              save_all_pars = TRUE)
+```
+
+Posterior predictive checks:
+
+```{r, fig.width = 8, fig.height = 6}
+pp_check(E2_cat, nsample = 100)
+```
+
+Perform LOO:
+
+```{r}
+E2_cont_loo <- loo(E2_cont, moment_match = TRUE)
+E2_cat_loo <- loo(E2_cat, moment_match = TRUE)
+
+# compare:
+
+E2_both_loo <- loo_compare(E2_cont_loo, E2_cat_loo)
+
+# show:
+
+E2_both_loo
+```
+
+Check Bayes R2:
+
+```{r}
+bayes_R2(E2_cat)
+bayes_R2(E2_cont)
+```
+
+Interpret the model:
+
+```{r}
+summary(E2_cont)
+summary(E2_cat)
+```
+
+Check all effects:
+
+```{r}
+E2_posts <- posterior_samples(E2_cont) %>% 
+  select(b_Cosine:b_NounFreq_log10)
+
+# Extract posteriors:
+
+b_cosine <- E2_posts$b_Cosine
+b_attested <- E2_posts$b_PairAttestednot_attested
+b_adj <- E2_posts$b_AdjFreq_log10
+b_noun <- E2_posts$b_NounFreq_log10
+```
+
+Check:
+
+```{r}
+sum(b_cosine > 0) / length(b_cosine)
+sum(b_attested > 0) / length(b_attested)
+sum(b_adj > 0) / length(b_adj)
+sum(b_noun > 0) / length(b_noun)
+```
+
+
+## Experiment 1 and 2, coefficient plots
+
+Make a coefficient plot. First make both tables of posterior estimates into long format:
+
+```{r}
+# Experiment 1:
+
+E1_posts_long <- pivot_longer(E1_posts,
+                              cols = b_Cosine:b_NounFreq_log10,
+                              values_to = 'Estimate',
+                              names_to = 'Coefficient')
+
+# Experiment 2:
+
+E2_posts_long <- pivot_longer(E2_posts,
+                              cols = b_Cosine:b_NounFreq_log10,
+                              values_to = 'Estimate',
+                              names_to = 'Coefficient')
+```
+
+Get 95% CIs:
+
+```{r}
+# Experiment 1:
+
+E1_coefs <- posts_long %>% group_by(Coefficient) %>% 
+  summarize(M = mean(Estimate),
+            LowerCI = quantile(Estimate, 0.025),
+            UpperCI = quantile(Estimate, 0.975))
+
+# Experiment 2:
+
+E2_coefs <- posts_long %>% group_by(Coefficient) %>% 
+  summarize(M = mean(Estimate),
+            LowerCI = quantile(Estimate, 0.025),
+            UpperCI = quantile(Estimate, 0.975))
+```
+
+Rename the coefficients so that they are prettier for plotting:
+
+```{r}
+# Experiment 1:
+
+E1_coefs <- mutate(E1_coefs,
+                   Coefficient = ifelse(Coefficient == 'b_PairAttestednot_attested',
+                                        'Corpus attestation', Coefficient),
+                   Coefficient = ifelse(Coefficient == 'b_AdjFreq_log10',
+                                        'Adjective frequency', Coefficient),
+                   Coefficient = ifelse(Coefficient == 'b_NounFreq_log10',
+                                        'Noun frequency', Coefficient),
+                   Coefficient = ifelse(Coefficient == 'b_Cosine',
+                                        'Cosine similarity', Coefficient))
+
+# Experiment 2:
+
+E2_coefs <- mutate(E2_coefs,
+                   Coefficient = ifelse(Coefficient == 'b_PairAttestednot_attested',
+                                        'Corpus attestation', Coefficient),
+                   Coefficient = ifelse(Coefficient == 'b_AdjFreq_log10',
+                                        'Adjective frequency', Coefficient),
+                   Coefficient = ifelse(Coefficient == 'b_NounFreq_log10',
+                                        'Noun frequency', Coefficient),
+                   Coefficient = ifelse(Coefficient == 'b_Cosine',
+                                        'Cosine similarity', Coefficient))
+```
+
+Plot this, Experiment 1:
+
+```{r, fig.width = 8, fig.height = 6}
+E1_coef_p <- E1_coefs %>% 
+  ggplot(aes(x = reorder(Coefficient, M), y = M,
+             ymin = LowerCI, ymax = UpperCI)) +
+  geom_point(pch = 15, size = 2) +
+  geom_errorbar(width = 0.2) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  coord_flip() +
+  theme_minimal() +
+  xlab('Model coefficient') +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(face = 'bold', size = 16))
+
+# Show and save:
+E1_coef_p
+ggsave(plot = E1_coef_p, filename = '../figures/E1_coefficient_plot.pdf',
+       width = 8, height = 6)
+```
+
+Plot this, Experiment 2:
+
+```{r, fig.width = 8, fig.height = 6}
+E2_coef_p <- E2_coefs %>% 
+  ggplot(aes(x = reorder(Coefficient, M), y = M,
+             ymin = LowerCI, ymax = UpperCI)) +
+  geom_point(pch = 15, size = 2) +
+  geom_errorbar(width = 0.2) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  coord_flip() +
+  theme_minimal() +
+  xlab('Model coefficient') +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(face = 'bold', size = 16))
+
+# Show and save:
+E2_coef_p
+ggsave(plot = E1_coef_p, filename = '../figures/E2_coefficient_plot.pdf',
+       width = 8, height = 6)
+```
+
+Put them both into the same plot:
+
+```{r}
+E1_coef_p <- E1_coef_p + ggtitle('(a) Experiment 1')
+E2_coef_p <- E2_coef_p + ggtitle('(b) Experiment 2')
+
+# Save:
+
+both_coef_p <- E1_coef_p + E2_coef_p
+ggsave(plot = both_coef_p, filename = '../data/both_coefficient_plots.pdf',
+       width = 12, height = 6)
+```
+
+This completes this analysis.
+
