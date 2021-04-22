@@ -4,6 +4,6 @@ This script contains the analysis of two experiments, one focused on metaphorici
 
 The script folder contains two scripts:
 
-- *cosine_calibration.Rmd* : creates the stimuli (pre-registered)
-- *experiment_analysis.Rmd* : analyzes the main experiment data
+- **cosine_calibration.Rmd** : creates the stimuli (pre-registered)
+- **experiment_analysis.Rmd** : analyzes the main experiment data
 
