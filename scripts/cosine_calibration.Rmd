@@ -13,10 +13,16 @@ The goal of this experiment is to see whether the cosine measure introduced by W
 
 ## Preprocessing:
 
-Load data and pacakges
+Load packages:
 
-```{r, message = FALSE}
+```{r, message = FALSE, warning = FALSE}
 library(tidyverse)
+library(brms)
+```
+
+Load data:
+
+```{r, message = FALSE, warning = FALSE}
 lyn <- read_csv('../data/lynott_connell_full.csv') %>% 
   select(-(Foot_leg.mean:Torso.mean), -Exclusivity.action, -Exclusivity.sensorimotor) %>% 
   rename(Excl = Exclusivity.perceptual,
@@ -111,6 +117,12 @@ Get our adjectives:
 
 ```{r}
 adj <- filter(adj, Word %in% these_words)
+```
+
+Show all adjectives:
+
+```{r}
+adj %>% arrange(Mod) %>% select(Word, Mod) %>% print(n = Inf)
 ```
 
 
@@ -336,6 +348,22 @@ xall[37, ] <- filter(all_combs, Adj == 'woolly', Noun == 'vision')
 xall[40, ] <- filter(all_combs, Adj == 'scaly', Noun == 'glimmer')
 ```
 
+Some more hand replacements: For "contact", the social reading is quite strong. And "timbre" could easily be misunderstood as "timber", the wood, for less musically educated participants.
+
+```{r}
+# warm timbre:
+xall[17, ] <- filter(all_combs, Adj == 'loud', Noun == 'color')
+
+# beeping timbre:
+xall[48, ] <- filter(all_combs, Adj == 'beeping', Noun == 'noise')
+
+# squealing contact: 
+xall[28, ] <- filter(all_combs, Adj == 'bright', Noun == 'touch')
+
+# blue contact:
+xall[35, ] <- filter(all_combs, Adj == 'smooth', Noun == 'color')
+```
+
 For the band 0.8 to 0.9 there's nothing we can do since they are all touch-touch, except for one taste-taste.
 
 How is this distributed across noun modalities?
@@ -402,13 +430,200 @@ xall[xall$Noun == 'vision', ]$FullStimulus <- 'woolly sight'
 xall[xall$Noun == 'vision', ]$Noun <- 'sight'
 ```
 
+## Adding frequency information
+
+The Corpus of Contemporary American English data is proprietary and will not be included in the repository. The adjective-noun combination frequencies come from https://www.english-corpora.org/coca/ directly and will be included in the repository since it's only 50 items:
+
+```{r, message = FALSE, warning = FALSE}
+freqs <- read_csv('../data/COCA_freq_CD.csv')
+
+# adjective-noun pair frequencies:
+
+pair_freqs <- read_csv('../data/COCA_frequencies.csv')
+```
+
+Get the total COCA freqs:
+
+```{r}
+freqs <- mutate(freqs,
+                coca = freq_coca_spok + freq_coca_fic + freq_coca_mag +
+                  freq_coca_news + freq_coca_acad)
+```
+
+
+We don't use lemmas here but the actual frequencies of the inflected forms, e.g., we are not interested in "beeped/beeps" but only in "beeping", which is the form used.
+
+```{r}
+xall$AdjFreq <- freqs[match(xall$Adj, freqs$w1), ]$coca
+xall$NounFreq <- freqs[match(xall$Noun, freqs$w1), ]$coca
+```
+
+For adjective-noun pair frequencies, perform matching:
+
+```{r}
+pair_freqs <- mutate(pair_freqs, FullStimulus = str_c(Adj, ' ', Noun))
+xall <- left_join(xall, select(pair_freqs, -Adj, -Noun),
+                  by = c('FullStimulus' = 'FullStimulus'))
+
+# Rename:
+
+xall <- rename(xall, PairFreq = COCA_freq)
+```
+
+Log-transform the frequency variables:
+
+```{r}
+xall <- mutate(xall,
+               AdjFreq_log10 = log10(AdjFreq),
+               NounFreq_log10 = log10(NounFreq),
+               PairFreq_log10 = log10(PairFreq + 1))
+```
+
+Create a variable that says whether it's attested or not:
+
+```{r}
+xall <- mutate(xall,
+               PairAttested = ifelse(PairFreq > 0, 'attested', 'not_attested'))
+```
+
+## Analyze frequency and cosine correlation
+
+To know whether we should control for frequency in the main analysis, we want to know whether cosines are correlated with frequencies.
+
+brms settings for faster computing:
+
+```{r}
+options(mc.cores=parallel::detectCores())
+```
+
+With brms (only default priors). First, whether cosines are higher for attested or non-attested:
+
+```{r, message = FALSE, warning = FALSE}
+attested_mdl <- brm(Cosine ~ PairAttested +
+                      (1|Adj) + (1|Noun),
+                    data = xall,
+                    family = Beta(),
+                    
+                    # MCMC variables:
+                    
+                    cores = 4, chains = 4,
+                    init = 0, seed = 42)
+
+raw_freq_mdl <- brm(Cosine ~ PairFreq_log10 +
+                      (1|Adj) + (1|Noun),
+                    data = xall,
+                    family = Beta(),
+                    
+                    # MCMC variables:
+                    cores = 4, chains = 4,
+                    init = 0, seed = 42)
+```
+
+Summarize:
+
+```{r}
+summary(attested_mdl)
+summary(raw_freq_mdl)
+```
+
+Posterior predictive checks for attested / not attested model:
+
+```{r, fig.width = 8, fig.height = 6}
+pp_check(attested_mdl, nsample = 100)
+```
+
+Posterior predictive checks for raw frequency model:
+
+```{r}
+pp_check(raw_freq_mdl, nsample = 100)
+```
+
+Which model performs better? R-squared:
+
+```{r}
+bayes_R2(raw_freq_mdl)
+bayes_R2(attested_mdl)
+```
+
+LOO-CV:
+
+```{r}
+raw_loo <- loo(raw_freq_mdl)
+attested_loo <- loo(attested_mdl)
+
+# Compare:
+
+both_loo <- loo_compare(raw_loo, attested_loo)
+both_loo
+```
+
+Now big difference between the two, so we will use the simpler attested versus non-attested, which also makes sense given that most are not attested.
+
+This analysis suggests that in our main model, we can go ahead with a single predictor attested versus non-attested. To compare the two models, we used Cosine as the response (so that the two models are fitted on the same data). For the paper however, it will be conceptually easier to report things in terms of corpus attestation being the response and Cosine being the predictor, given that we selected Cosines.
+
+Prior choice:
+
+```{r}
+weak_prior <- prior('normal(0, 2)', class = 'b')
+```
+
+The model:
+
+```{r, message = FALSE, warning = FALSE}
+logistic_mdl <- brm(PairAttested ~ Cosine  +
+                      (1|Adj) + (1|Noun),
+                    data = xall,
+                    family = bernoulli,
+                    
+                    prior = weak_prior,
+                    
+                    # MCMC variables:
+                    
+                    cores = 4, chains = 4,
+                    init = 0, seed = 42,
+                    warmup = 3000, iter = 5000,
+                    control = list(adapt_delta = 0.99))
+```
+
+Posterior predictive checks:
+
+```{r, fig.width = 8, fig.height = 6}
+pp_check(logistic_mdl, nsample = 100)
+```
+
+Check:
+
+```{r}
+summary(logistic_mdl)
+```
+
+Extract the posterior probability of the effect being the opposite sign:
+
+```{r}
+slope_samples <- posterior_samples(logistic_mdl)$b_Cosine
+
+# How many of those are not negative?
+
+sum(slope_samples > 0) / length(slope_samples)
+```
+
+What is the average cosine for each of these?
+
+```{r}
+xall %>% group_by(PairAttested) %>% 
+  summarize(M = mean(Cosine),
+            SD = sd(Cosine),
+            M = round(M, 2),
+            SD = round(SD, 2))
+```
+
+## Finish by saving the data
+
 Write this to file:
 
 ```{r}
 write_csv(xall, '../data/stimuli.csv')
 ```
-
-
 
 
 
