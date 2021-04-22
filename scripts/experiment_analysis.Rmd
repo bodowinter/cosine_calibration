@@ -413,6 +413,15 @@ Posterior predictive checks:
 pp_check(E1_cat, nsample = 100)
 ```
 
+Save the models:
+
+```{r}
+save(E1_cont, file = '../models/E1_cont_mdl.Rdata',
+     compress = 'xz', compression_level = 9)
+save(E1_cat, file = '../models/E1_cat_mdl.Rdata',
+     compress = 'xz', compression_level = 9)
+```
+
 Perform LOO:
 
 ```{r}
@@ -426,6 +435,15 @@ E1_both_loo <- loo_compare(E1_cont_loo, E1_cat_loo)
 # show:
 
 E1_both_loo
+```
+
+Save LOOs:
+
+```{r}
+save(E1_cont_loo, file = '../models/E1_cont_loo.Rdata',
+     compress = 'xz', compression_level = 9)
+save(E1_cat_loo, file = '../models/E1_cat_loo.Rdata',
+     compress = 'xz', compression_level = 9)
 ```
 
 Check Bayes R2:
@@ -522,6 +540,15 @@ Posterior predictive checks:
 pp_check(E2_cat, nsample = 100)
 ```
 
+Save the models:
+
+```{r}
+save(E2_cont, file = '../models/E2_cont_mdl.Rdata',
+     compress = 'xz', compression_level = 9)
+save(E2_cat, file = '../models/E2_cat_mdl.Rdata',
+     compress = 'xz', compression_level = 9)
+```
+
 Perform LOO:
 
 ```{r}
@@ -535,6 +562,15 @@ E2_both_loo <- loo_compare(E2_cont_loo, E2_cat_loo)
 # show:
 
 E2_both_loo
+```
+
+Save LOOs:
+
+```{r}
+save(E2_cont_loo, file = '../models/E2_cont_loo.Rdata',
+     compress = 'xz', compression_level = 9)
+save(E2_cat_loo, file = '../models/E2_cat_loo.Rdata',
+     compress = 'xz', compression_level = 9)
 ```
 
 Check Bayes R2:
