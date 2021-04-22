@@ -295,8 +295,14 @@ ggsave(plot = E2_joy, filename = '../figures/E2_joy_plot.pdf',
 Put both together and save them in one:
 
 ```{r}
-E1_joy <- E1_joy + ggtitle('(a) Experiment 1')
-E2_joy <- E2_joy + ggtitle('(b) Experiment 2')
+E1_joy <- E1_joy + ggtitle('(a) Experiment 1') +
+  theme(plot.title = element_text(face = 'bold', size = 18,
+                                  margin = margin(b = 20, t = 0,
+                                                  r = 0, l = 0)))
+E2_joy <- E2_joy + ggtitle('(b) Experiment 2') + 
+  theme(plot.title = element_text(face = 'bold', size = 18,
+                                  margin = margin(b = 20, t = 0,
+                                                  r = 0, l = 0)))
 
 # Put both together:
 
@@ -316,9 +322,37 @@ ggsave(plot = both_joy, filename = '../figures/both_joy_plots.pdf',
        width = 12, height = 6)
 ```
 
+## Corpus attestation descriptive stats
+
+Check how corpus attestation influenced this:
+
+```{r}
+E1 %>% group_by(PairAttested) %>% 
+  summarize(M = mean(ResponseNum),
+            SD = sd(ResponseNum))
+```
+
+Recode this factor so that it becomes easier to interpret in the model (make "not attested" the reference level):
+
+```{r}
+E1 <- mutate(E1,
+             PairAttested = factor(PairAttested,
+                                   levels = c('not_attested', 'attested')))
+
+E2 <- mutate(E2,
+             PairAttested = factor(PairAttested,
+                                   levels = c('not_attested', 'attested')))
+```
+
 ## Bayesian models, Experiment 1:
 
-Prior, a weakly informative prior on the slope coefficient with SD = 2:
+Set MCMC controls for all models:
+
+```{r}
+mcmc_controls <- list(adapt_delta = 0.99, max_treedepth = 13)
+```
+
+Prior, a weakly informative prior on the slope coefficient with SD = 2 (pre-registered):
 
 ```{r}
 weak_prior <- prior('normal(0, 2)', class = 'b')
@@ -338,9 +372,10 @@ E1_cont <- brm(ResponseNum ~ Cosine +
               
                # MCMC variables:
               
+               control = mcmc_controls,
                cores = 4, chains = 4,
                init = 0, seed = 42,
-               warmup = 2000, iter = 4000,
+               warmup = 3000, iter = 5000,
                save_all_pars = TRUE)
 ```
 
@@ -365,9 +400,10 @@ E1_cat <- brm(ResponseNum ~ CrossModality +
               
               # MCMC variables:
               
+              control = mcmc_controls,
               cores = 4, chains = 4,
               init = 0, seed = 42,
-              warmup = 2000, iter = 4000,
+              warmup = 3000, iter = 5000,
               save_all_pars = TRUE)
 ```
 
@@ -424,9 +460,9 @@ Check:
 
 ```{r}
 sum(b_cosine > 0) / length(b_cosine)
-sum(b_attested > 0) / length(b_attested)
-sum(b_adj > 0) / length(b_adj)
-sum(b_noun > 0) / length(b_noun)
+sum(b_attested < 0) / length(b_attested)
+sum(b_adj < 0) / length(b_adj)
+sum(b_noun < 0) / length(b_noun)
 ```
 
 ## Bayesian models, Experiment 2:
@@ -445,9 +481,10 @@ E2_cont <- brm(ResponseNum ~ Cosine +
               
                # MCMC variables:
               
+               control = mcmc_controls,
                cores = 4, chains = 4,
                init = 0, seed = 42,
-               warmup = 2000, iter = 4000,
+               warmup = 3000, iter = 5000,
                save_all_pars = TRUE)
 ```
 
@@ -472,9 +509,10 @@ E2_cat <- brm(ResponseNum ~ CrossModality +
               
               # MCMC variables:
               
+              control = mcmc_controls,
               cores = 4, chains = 4,
               init = 0, seed = 42,
-              warmup = 2000, iter = 4000,
+              warmup = 3000, iter = 5000,
               save_all_pars = TRUE)
 ```
 
@@ -562,14 +600,14 @@ Get 95% CIs:
 ```{r}
 # Experiment 1:
 
-E1_coefs <- posts_long %>% group_by(Coefficient) %>% 
+E1_coefs <- E1_posts_long %>% group_by(Coefficient) %>% 
   summarize(M = mean(Estimate),
             LowerCI = quantile(Estimate, 0.025),
             UpperCI = quantile(Estimate, 0.975))
 
 # Experiment 2:
 
-E2_coefs <- posts_long %>% group_by(Coefficient) %>% 
+E2_coefs <- E2_posts_long %>% group_by(Coefficient) %>% 
   summarize(M = mean(Estimate),
             LowerCI = quantile(Estimate, 0.025),
             UpperCI = quantile(Estimate, 0.975))
@@ -609,14 +647,18 @@ Plot this, Experiment 1:
 E1_coef_p <- E1_coefs %>% 
   ggplot(aes(x = reorder(Coefficient, M), y = M,
              ymin = LowerCI, ymax = UpperCI)) +
-  geom_point(pch = 15, size = 2) +
+  geom_point(pch = 15, size = 3) +
   geom_errorbar(width = 0.2) +
   geom_hline(yintercept = 0, linetype = 2) +
+  ylab('Model coefficient') +
   coord_flip() +
   theme_minimal() +
-  xlab('Model coefficient') +
   theme(axis.title.y = element_blank(),
-        axis.title.x = element_text(face = 'bold', size = 16))
+        axis.title.x = element_text(face = 'bold', size = 14,
+                                    margin = margin(t = 20, b = 0,
+                                                    r = 0, l = 0)),
+        axis.text.y = element_text(face = 'bold', size = 12),
+        axis.text.x = element_text(size = 12))
 
 # Show and save:
 E1_coef_p
@@ -648,13 +690,19 @@ ggsave(plot = E1_coef_p, filename = '../figures/E2_coefficient_plot.pdf',
 Put them both into the same plot:
 
 ```{r}
-E1_coef_p <- E1_coef_p + ggtitle('(a) Experiment 1')
-E2_coef_p <- E2_coef_p + ggtitle('(b) Experiment 2')
+E1_coef_p <- E1_coef_p + ggtitle('(a) Experiment 1') +
+  theme(plot.title = element_text(face = 'bold', size = 18,
+                                  margin = margin(b = 20, t = 0,
+                                                  r = 0, l = 0)))
+E2_coef_p <- E2_coef_p + ggtitle('(b) Experiment 2') +
+  theme(plot.title = element_text(face = 'bold', size = 18,
+                                  margin = margin(b = 20, t = 0,
+                                                  r = 0, l = 0)))
 
 # Save:
 
 both_coef_p <- E1_coef_p + E2_coef_p
-ggsave(plot = both_coef_p, filename = '../data/both_coefficient_plots.pdf',
+ggsave(plot = both_coef_p, filename = '../figures/both_coefficient_plots.pdf',
        width = 12, height = 6)
 ```
 
