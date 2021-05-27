@@ -1,6 +1,6 @@
 ---
 title: "Cosine Calibration - Material selection"
-author: "Bodo Winter"
+author: "Anonymous"
 date: "8/11/2019"
 output: html_document
 ---

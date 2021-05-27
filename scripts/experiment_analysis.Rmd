@@ -1,6 +1,6 @@
 ---
 title: "Analysis of metaphoricity & creativity"
-author: "Bodo"
+author: "Anonymous"
 date: "19/04/2021"
 output: html_document
 ---
@@ -18,6 +18,7 @@ library(tidyverse)
 library(brms)
 library(ggridges)
 library(patchwork)
+library(ggrepel)
 ```
 
 Load experiment data:
@@ -251,8 +252,9 @@ Make a joy plot of this:
 E1_joy <- E1 %>% ggplot(aes(x = Cosine,
                        y = factor(Response))) +
   xlab('Cosine similarity') +
-  geom_density_ridges() +
-  # coord_cartesian(xlim = c(0, 1)) +
+  geom_density_ridges(fill = 'steelblue', alpha = 0.8) +
+  scale_x_continuous(breaks = seq(0, 1, 0.2)) +
+  xlim(0, 1) +
   theme_ridges() +
   theme(axis.title.y = element_blank(),
         axis.text.y = element_text(face = 'bold'),
@@ -263,8 +265,9 @@ E1_joy <- E1 %>% ggplot(aes(x = Cosine,
 E2_joy <- E2 %>% ggplot(aes(x = Cosine,
                        y = factor(Response))) +
   xlab('Cosine similarity') +
-  geom_density_ridges() +
-  # coord_cartesian(xlim = c(0, 1)) +
+  geom_density_ridges(fill = 'steelblue', alpha = 0.8) +
+  scale_x_continuous(breaks = seq(0, 1, 0.2)) +
+  xlim(0, 1) +
   theme_ridges() +
   theme(axis.title.y = element_blank(),
         axis.text.y = element_text(face = 'bold'),
@@ -469,7 +472,7 @@ E1_posts <- posterior_samples(E1_cont) %>%
 # Extract posteriors:
 
 b_cosine <- E1_posts$b_Cosine
-b_attested <- E1_posts$b_PairAttestednot_attested
+b_attested <- E1_posts$b_PairAttestedattested
 b_adj <- E1_posts$b_AdjFreq_log10
 b_noun <- E1_posts$b_NounFreq_log10
 ```
@@ -596,7 +599,7 @@ E2_posts <- posterior_samples(E2_cont) %>%
 # Extract posteriors:
 
 b_cosine <- E2_posts$b_Cosine
-b_attested <- E2_posts$b_PairAttestednot_attested
+b_attested <- E2_posts$b_PairAttestedattested
 b_adj <- E2_posts$b_AdjFreq_log10
 b_noun <- E2_posts$b_NounFreq_log10
 ```
@@ -655,7 +658,7 @@ Rename the coefficients so that they are prettier for plotting:
 # Experiment 1:
 
 E1_coefs <- mutate(E1_coefs,
-                   Coefficient = ifelse(Coefficient == 'b_PairAttestednot_attested',
+                   Coefficient = ifelse(Coefficient == 'b_PairAttestedattested',
                                         'Corpus attestation', Coefficient),
                    Coefficient = ifelse(Coefficient == 'b_AdjFreq_log10',
                                         'Adjective frequency', Coefficient),
@@ -667,7 +670,7 @@ E1_coefs <- mutate(E1_coefs,
 # Experiment 2:
 
 E2_coefs <- mutate(E2_coefs,
-                   Coefficient = ifelse(Coefficient == 'b_PairAttestednot_attested',
+                   Coefficient = ifelse(Coefficient == 'b_PairAttestedattested',
                                         'Corpus attestation', Coefficient),
                    Coefficient = ifelse(Coefficient == 'b_AdjFreq_log10',
                                         'Adjective frequency', Coefficient),
@@ -680,47 +683,79 @@ E2_coefs <- mutate(E2_coefs,
 Plot this, Experiment 1:
 
 ```{r, fig.width = 8, fig.height = 6}
-E1_coef_p <- E1_coefs %>% 
-  ggplot(aes(x = reorder(Coefficient, M), y = M,
-             ymin = LowerCI, ymax = UpperCI)) +
+# Setting up the plot basics:
+
+E1_coef_p <- E1_coefs %>% ggplot(aes(x = M, y = reorder(Coefficient, M),
+                        xmin = LowerCI, xmax = UpperCI))
+
+# Adding geoms:
+
+E1_coef_p <- E1_coef_p +
   geom_point(pch = 15, size = 3) +
   geom_errorbar(width = 0.2) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  ylab('Model coefficient') +
-  coord_flip() +
-  theme_minimal() +
+  geom_vline(xintercept = 0, linetype = 2)
+
+# Axes:
+
+E1_coef_p <- E1_coef_p +
+  coord_cartesian(xlim = c(-7, 1)) +
+  scale_x_continuous(breaks = seq(-7, 1, 1)) +
+  xlab('Model coefficient') +
+  ylab(NULL)
+
+# Cosmetics:
+
+E1_coef_p <- E1_coef_p +
+  theme_classic() +
   theme(axis.title.y = element_blank(),
-        axis.title.x = element_text(face = 'bold', size = 14,
-                                    margin = margin(t = 20, b = 0,
+        axis.title.x = element_text(face = 'bold', size = 16,
+                                    margin = margin(t = 10, b = 0,
                                                     r = 0, l = 0)),
-        axis.text.y = element_text(face = 'bold', size = 12),
+        axis.text.y = element_text(face = 'bold', size = 14),
         axis.text.x = element_text(size = 12))
 
-# Show and save:
 E1_coef_p
 ggsave(plot = E1_coef_p, filename = '../figures/E1_coefficient_plot.pdf',
-       width = 8, height = 6)
+       width = 8, height = 4)
 ```
 
 Plot this, Experiment 2:
 
 ```{r, fig.width = 8, fig.height = 6}
-E2_coef_p <- E2_coefs %>% 
-  ggplot(aes(x = reorder(Coefficient, M), y = M,
-             ymin = LowerCI, ymax = UpperCI)) +
-  geom_point(pch = 15, size = 2) +
-  geom_errorbar(width = 0.2) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  coord_flip() +
-  theme_minimal() +
-  xlab('Model coefficient') +
-  theme(axis.title.y = element_blank(),
-        axis.title.x = element_text(face = 'bold', size = 16))
+# Setting up the plot basics:
 
-# Show and save:
+E2_coef_p <- E2_coefs %>% ggplot(aes(x = M, y = reorder(Coefficient, M),
+                        xmin = LowerCI, xmax = UpperCI))
+
+# Adding geoms:
+
+E2_coef_p <- E2_coef_p +
+  geom_point(pch = 15, size = 3) +
+  geom_errorbar(width = 0.2) +
+  geom_vline(xintercept = 0, linetype = 2)
+
+# Axes:
+
+E2_coef_p <- E2_coef_p +
+  coord_cartesian(xlim = c(-7, 1)) +
+  scale_x_continuous(breaks = seq(-7, 1, 1)) +
+  xlab('Model coefficient') +
+  ylab(NULL)
+
+# Cosmetics:
+
+E2_coef_p <- E2_coef_p +
+  theme_classic() +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(face = 'bold', size = 16,
+                                    margin = margin(t = 10, b = 0,
+                                                    r = 0, l = 0)),
+        axis.text.y = element_text(face = 'bold', size = 14),
+        axis.text.x = element_text(size = 12))
+
 E2_coef_p
-ggsave(plot = E1_coef_p, filename = '../figures/E2_coefficient_plot.pdf',
-       width = 8, height = 6)
+ggsave(plot = E2_coef_p, filename = '../figures/E2_coefficient_plot.pdf',
+       width = 8, height = 4)
 ```
 
 Put them both into the same plot:
@@ -737,10 +772,118 @@ E2_coef_p <- E2_coef_p + ggtitle('(b) Experiment 2') +
 
 # Save:
 
-both_coef_p <- E1_coef_p + E2_coef_p
+both_coef_p <- E1_coef_p + plot_spacer() + E2_coef_p +
+  plot_layout(nrow = 3, heights = c(5, 1, 5))
 ggsave(plot = both_coef_p, filename = '../figures/both_coefficient_plots.pdf',
-       width = 12, height = 6)
+       width = 12, height = 12)
 ```
+
+## Correlation between E1 and E2
+
+Get item-based averages for E1 and E2:
+
+```{r}
+E1_items <- E1 %>% 
+  group_by(Item) %>% 
+  summarize(Metaphoricity = mean(ResponseNum))
+
+E2_items <- E2 %>% 
+  group_by(Item) %>% 
+  summarize(Creativity = mean(ResponseNum))
+```
+
+Merge:
+
+```{r}
+both <- left_join(E1_items, E2_items)
+```
+
+Add stimulus characteristics for plotting:
+
+```{r}
+both <- left_join(both,
+                  select(stims, ID, Adj, Noun), by = c('Item' = 'ID'))
+```
+
+Merge the adjective and noun pair into string for plotting:
+
+```{r}
+both <- mutate(both,
+               Pair = str_c(Adj, ' ', Noun))
+```
+
+Z-scored variables for Bayesian correlation:
+
+```{r}
+both <- mutate(both,
+               Met_z = Metaphoricity - mean(Metaphoricity),
+               Met_z = Met_z / sd(Met_z),
+               Creat_z = Creativity - mean(Creativity),
+               Creat_z = Creat_z / sd(Creat_z))
+```
+
+Fit the model (no hand-specified priors here):
+
+```{r, warning = FALSE, message = FALSE}
+cor_mdl <- brm(Creat_z ~ -1 + Met_z,
+               data = both)
+```
+
+Summarize the models:
+
+```{r}
+summary(cor_mdl)
+```
+
+Get the coefficients:
+
+```{r}
+int <- fixef(cor_mdl)[1, ]
+slope <- fixef(cor_mdl)[2, ]
+```
+
+
+Show the correlation:
+
+```{r, fig.width = 8, fig.height = 6}
+set.seed(666) # for sampling subset
+both_p <- both %>% ggplot(aes(x = Metaphoricity, y = Creativity))
+
+# Add geoms:
+
+both_p <- both_p + 
+  geom_point(alpha = 0.8, size = 3) +
+  geom_text_repel(aes(label = Pair),
+                  max.overlaps = Inf,
+                  box.padding = 0.5,
+                  min.segment.length = 0)
+
+# Cosmetics:
+
+both_p <- both_p +
+  theme_classic() +
+  theme() +
+  theme(axis.title.y = element_text(face = 'bold', size = 16,
+                                    margin = margin(t = 0, b = 0,
+                                                    r = 10, l = 0)),
+        axis.title.x = element_text(face = 'bold', size = 16,
+                                    margin = margin(t = 10, b = 0,
+                                                    r = 0, l = 0)),
+        axis.text.y = element_text(face = 'bold', size = 14),
+        axis.text.x = element_text(face = 'bold', size = 14))
+
+# Show and save:
+
+both_p
+ggsave(plot = both_p, filename = '../figures/correlation.pdf',
+       width = 8, height = 6)
+```
+
+
+
+
+
+
 
 This completes this analysis.
 
