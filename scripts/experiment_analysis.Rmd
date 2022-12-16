@@ -1,6 +1,6 @@
 ---
 title: "Analysis of metaphoricity & creativity"
-author: "Anonymous"
+author: "Bodo Winter & Francesca Strik Lievers"
 date: "19/04/2021"
 output: html_document
 ---
@@ -357,14 +357,16 @@ mcmc_controls <- list(adapt_delta = 0.99, max_treedepth = 13)
 
 Prior, a weakly informative prior on the slope coefficient with SD = 2 (pre-registered):
 
+**Note Dec 13, 2022**: After acceptance of the paper, we were made aware of Lemoine (2019), and the fact that prior choices have to also be made with respect to the respective link functions, in this case the logit. It turns out that SD = 2 is actually biased towards more extreme values in probability space (0 and 1), as can be verified by `hist(plogis(rnorm(1000, 0, 2)))` compared to `hist(plogis(rnorm(1000, 0, 1)))`. We therefore chose half of the SD. The results remain qualitatively the same regardless of which SD value is chosen, and the conclusions are left untouched by this choice of priors.
+
 ```{r}
-weak_prior <- prior('normal(0, 2)', class = 'b')
+weak_prior <- prior('normal(0, 1)', class = 'b')
 ```
 
 Analyze the ratings, continuous model:
 
-```{r, message = FALSE, warning = FALSE}
-E1_cont <- brm(ResponseNum ~ Cosine +
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+E1_cont <- brm(ResponseNum ~ 1 + Cosine +
                  PairAttested + AdjFreq_log10 + NounFreq_log10 +
                  (1 + Cosine|ID) +
                  (1|Adj) + (1|Noun) + (1|Item),
@@ -379,19 +381,30 @@ E1_cont <- brm(ResponseNum ~ Cosine +
                cores = 4, chains = 4,
                init = 0, seed = 42,
                warmup = 3000, iter = 5000,
-               save_all_pars = TRUE)
+               save_pars = save_pars(all = TRUE))
+
+# Save:
+
+save(E1_cont, file = '../models/E1_cont_mdl.Rdata',
+     compress = 'xz', compression_level = 9)
+```
+
+Load:
+
+```{r}
+load('../models/E1_cont_mdl.Rdata')
 ```
 
 Posterior predictive checks:
 
 ```{r, fig.width = 8, fig.height = 6}
-pp_check(E1_cont, nsample = 100)
+pp_check(E1_cont, ndraws = 100)
 ```
 
 Analyze the ratings, categorical model:
 
-```{r, message = FALSE, warning = FALSE}
-E1_cat <- brm(ResponseNum ~ CrossModality +
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+E1_cat <- brm(ResponseNum ~ 1 + CrossModality +
                  PairAttested + AdjFreq_log10 + NounFreq_log10 +
                  (1 + CrossModality|ID) +
                  (1|Adj) + (1|Noun) + (1|Item),
@@ -407,46 +420,53 @@ E1_cat <- brm(ResponseNum ~ CrossModality +
               cores = 4, chains = 4,
               init = 0, seed = 42,
               warmup = 3000, iter = 5000,
-              save_all_pars = TRUE)
+              save_pars = save_pars(all = TRUE))
+
+# Save:
+
+save(E1_cat, file = '../models/E1_cat_mdl.Rdata',
+     compress = 'xz', compression_level = 9)
+```
+
+Load the models:
+
+```{r}
+load('../models/E1_cat_mdl.Rdata')
 ```
 
 Posterior predictive checks:
 
 ```{r, fig.width = 8, fig.height = 6}
-pp_check(E1_cat, nsample = 100)
-```
-
-Save the models:
-
-```{r}
-save(E1_cont, file = '../models/E1_cont_mdl.Rdata',
-     compress = 'xz', compression_level = 9)
-save(E1_cat, file = '../models/E1_cat_mdl.Rdata',
-     compress = 'xz', compression_level = 9)
+pp_check(E1_cat, ndraws = 100)
 ```
 
 Perform LOO:
 
-```{r}
+```{r eval = FALSE}
 E1_cont_loo <- loo(E1_cont, moment_match = TRUE)
 E1_cat_loo <- loo(E1_cat, moment_match = TRUE)
 
-# compare:
+# Save:
 
-E1_both_loo <- loo_compare(E1_cont_loo, E1_cat_loo)
-
-# show:
-
-E1_both_loo
-```
-
-Save LOOs:
-
-```{r}
 save(E1_cont_loo, file = '../models/E1_cont_loo.Rdata',
      compress = 'xz', compression_level = 9)
 save(E1_cat_loo, file = '../models/E1_cat_loo.Rdata',
      compress = 'xz', compression_level = 9)
+```
+
+Load and compare:
+
+```{r}
+load('../models/E1_cont_loo.Rdata')
+load('../models/E1_cat_loo.Rdata')
+
+# Compare:
+
+E1_both_loo <- loo_compare(E1_cont_loo, E1_cat_loo)
+
+# Show:
+
+E1_both_loo
 ```
 
 Check Bayes R2:
@@ -490,8 +510,8 @@ sum(b_noun < 0) / length(b_noun)
 
 Analyze the ratings, continuous model:
 
-```{r, message = FALSE, warning = FALSE}
-E2_cont <- brm(ResponseNum ~ Cosine +
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+E2_cont <- brm(ResponseNum ~ 1 + Cosine +
                  PairAttested + AdjFreq_log10 + NounFreq_log10 +
                  (1 + Cosine|ID) +
                  (1|Adj) + (1|Noun) + (1|Item),
@@ -506,19 +526,30 @@ E2_cont <- brm(ResponseNum ~ Cosine +
                cores = 4, chains = 4,
                init = 0, seed = 42,
                warmup = 3000, iter = 5000,
-               save_all_pars = TRUE)
+               save_pars = save_pars(all = TRUE))
+
+# Save:
+
+save(E2_cont, file = '../models/E2_cont_mdl.Rdata',
+     compress = 'xz', compression_level = 9)
+```
+
+Load:
+
+```{r}
+load('../models/E2_cont_mdl.Rdata')
 ```
 
 Posterior predictive checks:
 
 ```{r, fig.width = 8, fig.height = 6}
-pp_check(E2_cont, nsample = 100)
+pp_check(E2_cont, ndraws = 100)
 ```
 
 Analyze the ratings, categorical model:
 
-```{r, message = FALSE, warning = FALSE}
-E2_cat <- brm(ResponseNum ~ CrossModality +
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+E2_cat <- brm(ResponseNum ~ 1 + CrossModality +
                  PairAttested + AdjFreq_log10 + NounFreq_log10 +
                  (1 + CrossModality|ID) +
                  (1|Adj) + (1|Noun) + (1|Item),
@@ -534,29 +565,46 @@ E2_cat <- brm(ResponseNum ~ CrossModality +
               cores = 4, chains = 4,
               init = 0, seed = 42,
               warmup = 3000, iter = 5000,
-              save_all_pars = TRUE)
-```
+              save_pars = save_pars(all = TRUE))
 
-Posterior predictive checks:
+# Save:
 
-```{r, fig.width = 8, fig.height = 6}
-pp_check(E2_cat, nsample = 100)
-```
-
-Save the models:
-
-```{r}
-save(E2_cont, file = '../models/E2_cont_mdl.Rdata',
-     compress = 'xz', compression_level = 9)
 save(E2_cat, file = '../models/E2_cat_mdl.Rdata',
      compress = 'xz', compression_level = 9)
 ```
 
-Perform LOO:
+Load:
 
 ```{r}
+load('../models/E2_cat_mdl.Rdata')
+```
+
+
+Posterior predictive checks:
+
+```{r, fig.width = 8, fig.height = 6}
+pp_check(E2_cat, ndraws = 100)
+```
+
+Perform LOO:
+
+```{r eval = TRUE}
 E2_cont_loo <- loo(E2_cont, moment_match = TRUE)
 E2_cat_loo <- loo(E2_cat, moment_match = TRUE)
+
+# Save:
+
+save(E2_cont_loo, file = '../models/E2_cont_loo.Rdata',
+     compress = 'xz', compression_level = 9)
+save(E2_cat_loo, file = '../models/E2_cat_loo.Rdata',
+     compress = 'xz', compression_level = 9)
+```
+
+Load and compare:
+
+```{r}
+load('../models/E2_cont_loo.Rdata')
+load('../models/E2_cat_loo.Rdata')
 
 # compare:
 
@@ -565,15 +613,6 @@ E2_both_loo <- loo_compare(E2_cont_loo, E2_cat_loo)
 # show:
 
 E2_both_loo
-```
-
-Save LOOs:
-
-```{r}
-save(E2_cont_loo, file = '../models/E2_cont_loo.Rdata',
-     compress = 'xz', compression_level = 9)
-save(E2_cat_loo, file = '../models/E2_cat_loo.Rdata',
-     compress = 'xz', compression_level = 9)
 ```
 
 Check Bayes R2:
@@ -698,8 +737,8 @@ E1_coef_p <- E1_coef_p +
 # Axes:
 
 E1_coef_p <- E1_coef_p +
-  coord_cartesian(xlim = c(-7, 1)) +
-  scale_x_continuous(breaks = seq(-7, 1, 1)) +
+  coord_cartesian(xlim = c(-5, 1)) +
+  scale_x_continuous(breaks = seq(-5, 1, 1)) +
   xlab('Model coefficient') +
   ylab(NULL)
 
@@ -737,8 +776,8 @@ E2_coef_p <- E2_coef_p +
 # Axes:
 
 E2_coef_p <- E2_coef_p +
-  coord_cartesian(xlim = c(-7, 1)) +
-  scale_x_continuous(breaks = seq(-7, 1, 1)) +
+  coord_cartesian(xlim = c(-3, 1)) +
+  scale_x_continuous(breaks = seq(-3, 1, 1)) +
   xlab('Model coefficient') +
   ylab(NULL)
 
@@ -824,24 +863,33 @@ both <- mutate(both,
 
 Fit the model (no hand-specified priors here):
 
-```{r, warning = FALSE, message = FALSE}
+```{r, warning = FALSE, message = FALSE, eval = FALSE}
 cor_mdl <- brm(Creat_z ~ -1 + Met_z,
                data = both)
+
+# Save model:
+
+save(cor_mdl, file = '../models/correlation_mdl.Rdata',
+     compress = 'xz', compression_level = 9)
 ```
 
-Summarize the models:
+Load and summarize the models:
 
 ```{r}
+# Load:
+
+load('../models/correlation_mdl.Rdata')
+
+# Summarize:
+
 summary(cor_mdl)
 ```
 
-Get the coefficients:
+Get the coefficient:
 
 ```{r}
 int <- fixef(cor_mdl)[1, ]
-slope <- fixef(cor_mdl)[2, ]
 ```
-
 
 Show the correlation:
 
@@ -878,11 +926,6 @@ both_p
 ggsave(plot = both_p, filename = '../figures/correlation.pdf',
        width = 8, height = 6)
 ```
-
-
-
-
-
 
 
 This completes this analysis.

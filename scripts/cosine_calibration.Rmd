@@ -1,6 +1,6 @@
 ---
 title: "Cosine Calibration - Material selection"
-author: "Anonymous"
+author: "Bodo Winter & Francesca Strik Lievers"
 date: "8/11/2019"
 output: html_document
 ---
@@ -38,7 +38,10 @@ lyn <- filter(lyn, Mod != 'Interoceptive')
 Load SUBTLEX POS tags:
 
 ```{r, message = FALSE}
-SUBTL <- read_csv('../data/SUBTLEX_US_with_POS.csv') %>% rename(POS = Dom_PoS_SUBTLEX) %>% 
+SUBTL <- read.csv('../data/SUBTLEX_US_with_POS.csv',
+                  stringsAsFactors = FALSE) %>%
+  as_tibble() %>% 
+  rename(POS = Dom_PoS_SUBTLEX) %>% 
   select(Word, POS)
 ```
 
@@ -57,7 +60,9 @@ noun <- filter(lyn, POS == 'Noun')
 For adjectives, we'll use the Lynott & Connell (2009) norms. These contain many more useful adjectives, as they are more specifically focused on perception (e.g., there's many auditory words such as "banging", "beeping", "squealing" that don't occur in the new Lancaster norms):
 
 ```{r, message = FALSE}
-adj <- read_csv('../data/lynott_connell_2009_adj_norms.csv') %>% 
+adj <- read.csv('../data/lynott_connell_2009_adj_norms.csv',
+                stringsAsFactors = FALSE) %>% 
+  as_tibble() %>% 
   select(-PropertyBritish) %>% 
   rename(Mod = DominantModality,
          Excl = ModalityExclusivity)
@@ -564,7 +569,7 @@ This analysis suggests that in our main model, we can go ahead with a single pre
 Prior choice:
 
 ```{r}
-weak_prior <- prior('normal(0, 2)', class = 'b')
+weak_prior <- prior('normal(0, 1)', class = 'b')
 ```
 
 The model:
